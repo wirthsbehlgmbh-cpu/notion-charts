@@ -223,34 +223,35 @@ code{
       <div class="callout">
         <strong>Integration Token erstellen:</strong>
         <ol>
-          <li>Öffne <a href="https://www.notion.so/my-integrations" target="_blank">notion.so/my-integrations</a></li>
-          <li>Klicke <strong>+ New integration</strong> und speichere</li>
-          <li>Kopiere den <strong>Internal Integration Token</strong> <code>ntn_…</code></li>
-          <li>Datenbank öffnen → <strong>⋯ → Connections → deine Integration</strong></li>
+          <li><a href="https://www.notion.so/my-integrations" target="_blank">notion.so/my-integrations</a> → <strong>Neue Integration</strong></li>
+          <li>Name z. B. <strong>ChartViewer</strong>, Typ: <strong>Internal</strong></li>
+          <li><strong>Token kopieren</strong> und unten einfügen</li>
+          <li>In Notion: Datenbank → <strong>···</strong> → <strong>Verbindungen</strong> → deine Integration wählen</li>
         </ol>
       </div>
       <div class="field">
-        <label>Integration Token</label>
-        <input type="password" id="inp-key" placeholder="ntn_… oder secret_…" autocomplete="off" oninput="update()"/>
+        <label>Integration Token <span class="label-hint">(secret_…)</span></label>
+        <input type="password" id="inp-key" placeholder="secret_abc123…" oninput="update()"/>
       </div>
       <div class="field">
-        <label>Datenbank-ID <span class="label-hint">aus der Notion-URL (32 Zeichen vor ?v=)</span></label>
-        <input type="text" id="inp-db" placeholder="306aa621d88480ce992bd6a73d4d8cd4" oninput="update()"/>
+        <label>Datenbank-ID <span class="label-hint">(aus der URL)</span></label>
+        <input type="text" id="inp-db" placeholder="32-stellig z. B. 195de9221179449f…" oninput="update()"/>
       </div>
     </div>
 
     <div class="section">
       <div class="section-title">Chart-Typ</div>
-      <div class="field">
-        <div class="pill-group" id="type-group">
-          <div class="pill on" data-val="line" onclick="setPill('type',this)">📈 Linie</div>
-          <div class="pill"    data-val="bar"  onclick="setPill('type',this)">📊 Balken</div>
-          <div class="pill"    data-val="pie"  onclick="setPill('type',this)">🥧 Kreis</div>
-        </div>
+      <div class="pill-group">
+        <div class="pill on" data-val="line"       onclick="setPill('type',this)">📈 Linie</div>
+        <div class="pill"    data-val="bar"        onclick="setPill('type',this)">📊 Balken</div>
+        <div class="pill"    data-val="pie"        onclick="setPill('type',this)">🥧 Kreis</div>
+        <div class="pill"    data-val="doughnut"   onclick="setPill('type',this)">🍩 Donut</div>
+        <div class="pill"    data-val="radar"      onclick="setPill('type',this)">🕸️ Radar</div>
+        <div class="pill"    data-val="polarArea"  onclick="setPill('type',this)">🎯 Polar</div>
       </div>
-      <div class="field" id="bardir-field" style="display:none;">
-        <label>Richtung</label>
-        <div class="pill-group" id="bardir-group">
+      <div class="field" id="bardir-field" style="display:none;margin-top:10px;">
+        <label>Balkenrichtung</label>
+        <div class="pill-group">
           <div class="pill on" data-val="vertical"   onclick="setPill('bardir',this)">Vertikal</div>
           <div class="pill"    data-val="horizontal" onclick="setPill('bardir',this)">Horizontal</div>
         </div>
@@ -259,25 +260,25 @@ code{
 
     <div class="section">
       <div class="section-title">Daten-Mapping</div>
-      <div class="row2">
-        <div class="field">
-          <label>X-Achse / Labels</label>
-          <input type="text" id="inp-x" placeholder="z. B. Datum" oninput="update()"/>
-        </div>
-        <div class="field">
-          <label>Y-Achse / Werte</label>
-          <input type="text" id="inp-y" placeholder="z. B. Betrag" oninput="update()"/>
-        </div>
+      <div class="field">
+        <label>X-Achse <span class="label-hint">(Spaltenname) <strong>Pflicht</strong></span></label>
+        <input type="text" id="inp-x" placeholder="z. B. Datum" oninput="update()"/>
       </div>
       <div class="row2">
+        <div class="field">
+          <label>Y-Achse <span class="label-hint">(optional)</span></label>
+          <input type="text" id="inp-y" placeholder="z. B. Betrag" oninput="update()"/>
+        </div>
         <div class="field">
           <label>Gruppierung <span class="label-hint">(optional)</span></label>
           <input type="text" id="inp-g" placeholder="z. B. Kategorie" oninput="update()"/>
         </div>
+      </div>
+      <div class="row2">
         <div class="field">
           <label>Aggregation</label>
           <select id="inp-agg" onchange="update()">
-            <option value="sum">Summe</option>
+            <option value="sum" selected>Summe</option>
             <option value="count">Anzahl</option>
             <option value="avg">Durchschnitt</option>
             <option value="min">Minimum</option>
@@ -331,7 +332,7 @@ code{
         <label>Optionen</label>
         <div class="opt-grid">
           <div class="opt-btn on" id="opt-cumul"  onclick="toggleOpt('cumul')">∑ Kumulativ</div>
-          <div class="opt-btn on" id="opt-dark"   onclick="toggleOpt('dark')">🌙 Dark Mode</div>
+          <div class="opt-btn on" id="opt-auto"   onclick="toggleOpt('auto')">🔄 Auto</div>
         </div>
       </div>
       <div class="field">
@@ -379,6 +380,17 @@ code{
       </div>
     </div>
 
+    <!-- Info Box -->
+    <div class="callout">
+      <strong>💡 Theme-Modi im Widget:</strong><br>
+      Das Widget kann zwischen 3 Modi wechseln:<br>
+      <strong>🔄 Auto</strong> – passt sich automatisch an dein System an<br>
+      <strong>🌙 Dark</strong> – immer dunkles Design<br>
+      <strong>☀️ Light</strong> – immer helles Design<br>
+      <br>
+      Der Button im Widget speichert deine Einstellung!
+    </div>
+
     <!-- GitHub hint -->
     <div class="callout">
       <strong>🚀 Hosting auf GitHub Pages (kostenlos):</strong><br>
@@ -404,7 +416,7 @@ code{
 </div>
 
 <script>
-const OPTS={cumul:true,dark:true};
+const OPTS={cumul:true,auto:true};
 const PILLS={type:'line',bardir:'vertical'};
 let currentTheme='dark';
 
@@ -472,7 +484,10 @@ function update(){
   if(title)p.set('title',title);
   if(PILLS.type==='bar'&&PILLS.bardir!=='vertical')p.set('bardir',PILLS.bardir);
   if(OPTS.cumul)p.set('cumul','1');
-  p.set('theme',OPTS.dark?'dark':'light');
+  
+  // Set theme parameter based on Auto option
+  p.set('theme', OPTS.auto ? 'auto' : (currentTheme === 'dark' ? 'dark' : 'light'));
+  
   if(proxy!=='https://corsproxy.io/?')p.set('proxy',proxy);
 
   const url=getBase()+'?'+p.toString();
