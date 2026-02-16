@@ -367,14 +367,15 @@ function renderChart(allRows){
           titleColor:C.text,bodyColor:C.text2,padding:10,cornerRadius:6,
           callbacks:{
             label:ctx=>{
-              // Für Pie/Doughnut/Polar/Radar Charts: Prozentanteil berechnen
+              // Für Pie/Doughnut/Polar/Radar Charts: Wert und Prozentanteil
               if(isCircle){
                 const dataset=ctx.dataset;
                 const total=dataset.data.reduce((sum,val)=>sum+(typeof val==='number'?val:0),0);
                 const value=ctx.raw;
                 const percentage=total>0?((value/total)*100).toFixed(1):'0.0';
                 const label=ctx.label||'';
-                return ' '+label+': '+percentage+'%';
+                const formattedValue=typeof value==='number'?value.toLocaleString('de-DE',{minimumFractionDigits:0,maximumFractionDigits:2}):value;
+                return ' '+label+'  '+formattedValue+' ('+percentage+'%)';
               }
               // Für andere Charts: normale Anzeige
               const v=typeof ctx.raw==='number'?ctx.raw.toLocaleString('de-DE',{minimumFractionDigits:0,maximumFractionDigits:2}):ctx.raw;
@@ -394,6 +395,39 @@ function renderChart(allRows){
   }
   if(P.type==='line'){
     cdata.datasets.forEach(ds=>{ds.tension=0.4;ds.fill=true;ds.pointRadius=3;ds.pointHoverRadius=6;ds.borderWidth=2;});
+  }
+
+  // Plugin für Center-Text bei Doughnut-Charts
+  const centerTextPlugin = {
+    id: 'centerText',
+    beforeDraw: (chart) => {
+      if(P.type !== 'doughnut') return;
+      
+      const {ctx, chartArea: {left, top, right, bottom}} = chart;
+      if(!chartArea) return;
+      
+      ctx.save();
+      
+      // Berechne Gesamtsumme
+      const total = chart.data.datasets[0].data.reduce((sum, val) => sum + (typeof val === 'number' ? val : 0), 0);
+      
+      // Zeichne den Text in der Mitte
+      const centerX = (left + right) / 2;
+      const centerY = (top + bottom) / 2;
+      
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = C.text;
+      ctx.font = 'bold 32px Inter, sans-serif';
+      ctx.fillText(total.toString(), centerX, centerY);
+      
+      ctx.restore();
+    }
+  };
+
+  // Füge Plugin zur Config hinzu wenn Doughnut
+  if(P.type === 'doughnut'){
+    cfg.plugins = [centerTextPlugin];
   }
 
   const canvas=document.getElementById('myChart');
