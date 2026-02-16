@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notion Chart</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400&display=swap');
+
+:root {
+  --bg:     #0f0f13;
+  --s1:     #17171d;
+  --border: #2c2c38;
+  --acc:    #5e6ad2;
+  --acc3:   #3dbf8c;
+  --text:   #e8e8f2;
+  --text2:  #7e7e9a;
+  --red:    #e15555;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; background:transparent; }
+
+body {
+  font-family:'DM Sans',sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display:flex; flex-direction:column;
+  height:100vh; padding:16px;
+}
+
+/* ── LOADING ── */
+#loading {
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:14px;
+}
+.spinner {
+  width:36px; height:36px;
+  border:3px solid var(--border);
+  border-top-color:var(--acc);
+  border-radius:50%; animation:spin .7s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.loading-text { font-size:13px; color:var(--text2); }
+.loading-sub  { font-size:11px; color:var(--text2); opacity:.6; font-family:'DM Mono',monospace; }
+
+/* ── ERROR ── */
+#error-state {
+  display:none; flex:1; flex-direction:column;
+  align-items:center; justify-content:center; gap:10px; text-align:center;
+}
+.error-icon { font-size:40px; opacity:.4; }
+.error-msg  { font-size:13px; color:var(--red); max-width:340px; line-height:1.6; }
+.error-hint { font-size:11px; color:var(--text2); max-width:340px; line-height:1.6; font-family:'DM Mono',monospace; }
+
+/* ── CHART ── */
+#chart-wrap {
+  display:none; flex:1; flex-direction:column; gap:0;
+}
+
+.chart-header {
+  display:flex; align-items:baseline; justify-content:space-between;
+  margin-bottom:10px; gap:12px;
+}
+.chart-title  { font-size:15px; font-weight:700; letter-spacing:-.3px; }
+.chart-meta   { font-size:10px; color:var(--text2); font-family:'DM Mono',monospace; white-space:nowrap; }
+
+.canvas-wrap { flex:1; position:relative; min-height:0; }
+
+/* ── FOOTER ── */
+.footer {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-top:10px; padding-top:8px;
+  border-top:1px solid var(--border);
+}
+.footer-label {
+  font-size:10px; color:var(--text2);
+  display:flex; align-items:center; gap:5px;
+}
+.footer-dot {
+  width:6px; height:6px; border-radius:50%;
+  background:var(--acc3); box-shadow:0 0 6px var(--acc3);
+}
+.refresh-btn {
+  font-size:10px; color:var(--text2);
+  background:none; border:none; cursor:pointer;
+  font-family:'DM Mono',monospace; padding:2px 6px;
+  border:1px solid var(--border); border-radius:4px;
+  transition:all .15s;
+}
+.refresh-btn:hover { color:var(--text); border-color:var(--text2); }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text">Lade Notion-Daten…</div>
+  <div class="loading-sub" id="loading-sub"></div>
+</div>
+
+<!-- ERROR -->
+<div id="error-state">
+  <div class="error-icon">⚠️</div>
+  <div class="error-msg" id="error-msg">Fehler beim Laden</div>
+  <div class="error-hint" id="error-hint"></div>
+</div>
+
+<!-- CHART -->
+<div id="chart-wrap">
+  <div class="chart-header">
+    <span class="chart-title" id="chart-title"></span>
+    <span class="chart-meta"  id="chart-meta"></span>
+  </div>
+  <div class="canvas-wrap">
+    <canvas id="myChart"></canvas>
+  </div>
+  <div class="footer">
+    <span class="footer-label">
+      <span class="footer-dot"></span>
+      Live · Notion API
+    </span>
+    <button class="refresh-btn" onclick="init()">↻ Aktualisieren</button>
+  </div>
+</div>
+
+<script>
+/* ====================================================
+   URL PARAMETER PARSING
+   All chart config comes from URL ?params
+   
+   Required:
+     key      = Notion integration token (ntn_... or secret_...)
+     db       = Notion database ID
+     x        = column name for X axis / labels
+   
+   Optional:
+     y        = column name for Y values (if omitted: count)
+     g        = groupBy column
+     agg      = sum|count|avg|min|max  (default: sum)
+     max      = max data points        (default: 20)
+     sort     = asc|desc|none          (default: none)
+     type     = bar|line|pie           (default: bar)
+     bardir   = vertical|horizontal    (default: vertical)
+     cumul    = 1|0                    (default: 0)
+     title    = chart title
+     pal      = 0-4 palette index      (default: 0)
+     filter   = column:value
+     proxy    = CORS proxy URL         (default: https://corsproxy.io/?)
+     theme    = dark|light             (default: dark)
+==================================================== */
+
+const PALS = [
+  ['#5e6ad2','#3dbf8c','#e16a3d','#e15555','#f0b429','#0ea5e9','#a855f7','#ec4899'],
+  ['#f97316','#ef4444','#f59e0b','#84cc16','#06b6d4','#8b5cf6','#ec4899','#14b8a6'],
+  ['#0ea5e9','#38bdf8','#7dd3fc','#0284c7','#0369a1','#164e63','#a5f3fc','#0891b2'],
+  ['#22c55e','#16a34a','#4ade80','#86efac','#166534','#15803d','#bbf7d0','#052e16'],
+  ['#e2e8f0','#94a3b8','#64748b','#475569','#334155','#1e293b','#cbd5e1','#f1f5f9'],
+];
+
+let P = {}; // parsed params
+let chartInst = null;
+
+function parseParams() {
+  const sp = new URLSearchParams(window.location.search);
+  P = {
+    key:    sp.get('key')   || '',
+    db:     sp.get('db')    || '',
+    x:      sp.get('x')     || '',
+    y:      sp.get('y')     || '',
+    g:      sp.get('g')     || '',
+    agg:    sp.get('agg')   || 'sum',
+    max:    parseInt(sp.get('max') || '20'),
+    sort:   sp.get('sort')  || 'none',
+    type:   sp.get('type')  || 'bar',
+    bardir: sp.get('bardir')|| 'vertical',
+    cumul:  sp.get('cumul') === '1',
+    title:  sp.get('title') || '',
+    pal:    parseInt(sp.get('pal') || '0'),
+    filter: sp.get('filter')|| '',
+    proxy:  sp.get('proxy') || 'https://corsproxy.io/?',
+    theme:  sp.get('theme') || 'dark',
+  };
+}
+
+async function init() {
+  parseParams();
+  applyTheme();
+
+  if (!P.key || !P.db || !P.x) {
+    showError(
+      'Fehlende Parameter in der URL',
+      'Benötigt: key= (API Token), db= (Datenbank-ID), x= (Spaltenname)\nSiehe Setup-Anleitung im Konfigurator.'
+    );
+    return;
+  }
+
+  setLoading('Verbinde mit Notion API…');
+
+  try {
+    const rows = await loadAllRows();
+    setLoading(`${rows.length} Einträge geladen, erstelle Chart…`);
+    renderChart(rows);
+  } catch(e) {
+    showError('Fehler beim Laden der Notion-Daten', e.message);
+  }
+}
+
+function applyTheme() {
+  if (P.theme === 'light') {
+    document.documentElement.style.setProperty('--bg',    '#ffffff');
+    document.documentElement.style.setProperty('--s1',    '#f8f9fa');
+    document.documentElement.style.setProperty('--border','#e2e8f0');
+    document.documentElement.style.setProperty('--text',  '#1e293b');
+    document.documentElement.style.setProperty('--text2', '#64748b');
+  }
+}
+
+/* ── Notion API ── */
+async function nfetch(url, body) {
+  const full = P.proxy + encodeURIComponent(url);
+  const r = await fetch(full, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${P.key}`,
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) {
+    const txt = await r.text().catch(()=>'');
+    throw new Error(`Notion API ${r.status}: ${txt.slice(0,200)}`);
+  }
+  return r.json();
+}
+
+async function loadAllRows() {
+  let rows=[], cursor=undefined;
+  for (let i=0; i<5; i++) {
+    const body = { page_size: 100 };
+    if (cursor) body.start_cursor = cursor;
+    setLoading(`Lade Seite ${i+1}… (${rows.length} Einträge)`);
+    const res = await nfetch(`https://api.notion.com/v1/databases/${P.db}/query`, body);
+    const extracted = (res.results||[]).map(extractRow);
+    rows = rows.concat(extracted);
+    if (!res.has_more) break;
+    cursor = res.next_cursor;
+  }
+  return rows;
+}
+
+function extractRow(page) {
+  const row = {};
+  Object.entries(page.properties||{}).forEach(([col, prop]) => {
+    row[col] = extractVal(prop);
+  });
+  return row;
+}
+
+function extractVal(prop) {
+  switch(prop.type) {
+    case 'title':        return prop.title?.[0]?.plain_text ?? '';
+    case 'rich_text':    return prop.rich_text?.[0]?.plain_text ?? '';
+    case 'number':       return prop.number ?? 0;
+    case 'select':       return prop.select?.name ?? '';
+    case 'multi_select': return prop.multi_select?.map(s=>s.name).join(', ') ?? '';
+    case 'checkbox':     return prop.checkbox ? 'Ja' : 'Nein';
+    case 'date':         return prop.date?.start ?? '';
+    case 'url':          return prop.url ?? '';
+    case 'email':        return prop.email ?? '';
+    case 'formula':      return prop.formula?.number ?? prop.formula?.string ?? '';
+    case 'rollup':       return prop.rollup?.number ?? prop.rollup?.array?.length ?? '';
+    case 'created_time': return new Date(prop.created_time).toLocaleDateString('de-DE');
+    case 'last_edited_time': return new Date(prop.last_edited_time).toLocaleDateString('de-DE');
+    default:             return '';
+  }
+}
+
+/* ── Chart rendering ── */
+function renderChart(allRows) {
+  // Apply filter
+  let rows = allRows.slice();
+  if (P.filter) {
+    const [col, ...valParts] = P.filter.split(':');
+    const val = valParts.join(':').toLowerCase();
+    rows = rows.filter(r => String(r[col]??'').toLowerCase().includes(val));
+  }
+
+  // Apply sort
+  if (P.sort !== 'none' && P.y) {
+    rows.sort((a,b) => {
+      const av=+a[P.y]||0, bv=+b[P.y]||0;
+      return P.sort==='asc' ? av-bv : bv-av;
+    });
+  }
+
+  const pal = PALS[P.pal % PALS.length];
+  let cdata;
+
+  if (P.g && P.y) {
+    cdata = buildGrouped(rows, pal);
+  } else if (P.y) {
+    cdata = buildSimple(rows, pal);
+  } else {
+    cdata = buildCount(rows, pal);
+  }
+
+  // Destroy old chart
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+
+  const isDark  = P.theme !== 'light';
+  const textCol = isDark ? '#e8e8f2' : '#1e293b';
+  const gridCol = isDark ? '#1e1e26' : '#f1f5f9';
+  const tooltipBg = isDark ? '#17171d' : '#ffffff';
+
+  Chart.defaults.color = isDark ? '#7e7e9a' : '#64748b';
+  Chart.defaults.borderColor = isDark ? '#2c2c38' : '#e2e8f0';
+
+  const isCircle = P.type === 'pie';
+  const cfg = {
+    type: P.type,
+    data: cdata,
+    options: {
+      indexAxis: P.type==='bar' && P.bardir==='horizontal' ? 'y' : 'x',
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 600, easing: 'easeInOutQuart' },
+      plugins: {
+        legend: {
+          display: isCircle || !!P.g,
+          labels: { color: textCol, font:{ family:'DM Sans', size:11 }, padding:12 }
+        },
+        title: { display: false },
+        tooltip: {
+          backgroundColor: tooltipBg,
+          borderColor: isDark ? '#2c2c38' : '#e2e8f0',
+          borderWidth: 1,
+          titleColor: textCol,
+          bodyColor: isDark ? '#7e7e9a' : '#64748b',
+          padding: 10,
+          callbacks: {
+            label: ctx => {
+              const v = typeof ctx.raw==='number' ? ctx.raw.toLocaleString('de-DE') : ctx.raw;
+              const prefix = P.cumul ? ' Kontostand' : ` ${ctx.dataset.label||''}`;
+              return `${prefix}: ${v}`;
+            }
+          }
+        }
+      }
+    }
+  };
+
+  if (!isCircle) {
+    cfg.options.scales = {
+      x: { grid:{display:true,color:gridCol}, ticks:{color:isDark?'#7e7e9a':'#64748b',font:{family:'DM Mono',size:10}} },
+      y: { grid:{display:true,color:gridCol}, ticks:{color:isDark?'#7e7e9a':'#64748b',font:{family:'DM Mono',size:10},callback:v=>typeof v==='number'?v.toLocaleString('de-DE'):v} }
+    };
+  }
+
+  if (P.type === 'line') {
+    cdata.datasets.forEach(ds => {
+      ds.tension = 0.4;
+      ds.fill = true;
+      ds.pointRadius = 3;
+      ds.pointHoverRadius = 5;
+    });
+  }
+
+  const canvas = document.getElementById('myChart');
+  chartInst = new Chart(canvas, cfg);
+
+  // Update header
+  const title = P.title || (P.cumul ? `Kontostand – ${P.x}` : `${P.y||P.x}`);
+  document.getElementById('chart-title').textContent = title;
+  document.getElementById('chart-meta').textContent =
+    `${allRows.length} Einträge · ${new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}`;
+
+  showChart();
+}
+
+/* ── Data builders ── */
+function toCumulative(values) {
+  let running = 0;
+  return values.map(v => { running += v; return Math.round(running * 100) / 100; });
+}
+
+function doAgg(vals, method) {
+  if (!vals.length) return 0;
+  switch(method) {
+    case 'sum':   return vals.reduce((a,b)=>a+b,0);
+    case 'count': return vals.length;
+    case 'avg':   return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*100)/100;
+    case 'min':   return Math.min(...vals);
+    case 'max':   return Math.max(...vals);
+    default:      return vals.reduce((a,b)=>a+b,0);
+  }
+}
+
+function buildSimple(rows, pal) {
+  const map={};
+  rows.forEach(r => {
+    const k=String(r[P.x]??'(leer)');
+    (map[k]||(map[k]=[])).push(+r[P.y]||0);
+  });
+  const entries=Object.entries(map).slice(0,P.max);
+  const labels=entries.map(([k])=>k);
+  let values=entries.map(([,v])=>doAgg(v,P.agg));
+  if (P.cumul) values=toCumulative(values);
+  const colors=labels.map((_,i)=>pal[i%pal.length]);
+  return {
+    labels,
+    datasets:[{
+      label: P.cumul ? P.y+' (kumulativ)' : P.y,
+      data: values,
+      backgroundColor: P.type==='line' ? colors[0]+'33' : colors.map(c=>c+'cc'),
+      borderColor: P.type==='line' ? colors[0] : colors,
+      borderWidth: 2,
+      hoverOffset: 6,
+    }]
+  };
+}
+
+function buildGrouped(rows, pal) {
+  const xVals=[...new Set(rows.map(r=>String(r[P.x]??'')))].slice(0,P.max);
+  const groups=[...new Set(rows.map(r=>String(r[P.g]??'')))];
+  const datasets=groups.map((g,gi)=>{
+    const color=pal[gi%pal.length];
+    let data=xVals.map(x=>{
+      const m=rows.filter(r=>String(r[P.x])===x && String(r[P.g])===g);
+      return doAgg(m.map(r=>+r[P.y]||0),P.agg);
+    });
+    if (P.cumul) data=toCumulative(data);
+    return {
+      label: P.cumul ? g+' (kumulativ)' : g,
+      data,
+      backgroundColor: P.type==='line' ? color+'33' : color+'cc',
+      borderColor: color,
+      borderWidth: 2, tension: 0.4,
+    };
+  });
+  return { labels:xVals, datasets };
+}
+
+function buildCount(rows, pal) {
+  const cnt={};
+  rows.forEach(r=>{const k=String(r[P.x]??'(leer)');cnt[k]=(cnt[k]||0)+1;});
+  const entries=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,P.max);
+  const labels=entries.map(([k])=>k);
+  const values=entries.map(([,v])=>v);
+  const colors=labels.map((_,i)=>pal[i%pal.length]);
+  return {
+    labels, datasets:[{
+      label:'Anzahl',
+      data:values,
+      backgroundColor:colors.map(c=>c+'cc'),
+      borderColor:colors,
+      borderWidth:2, hoverOffset:6,
+    }]
+  };
+}
+
+/* ── UI helpers ── */
+function setLoading(sub) {
+  document.getElementById('loading').style.display='flex';
+  document.getElementById('error-state').style.display='none';
+  document.getElementById('chart-wrap').style.display='none';
+  document.getElementById('loading-sub').textContent=sub;
+}
+
+function showError(msg, hint) {
+  document.getElementById('loading').style.display='none';
+  document.getElementById('chart-wrap').style.display='none';
+  const es=document.getElementById('error-state');
+  es.style.display='flex';
+  document.getElementById('error-msg').textContent=msg;
+  document.getElementById('error-hint').textContent=hint||'';
+}
+
+function showChart() {
+  document.getElementById('loading').style.display='none';
+  document.getElementById('error-state').style.display='none';
+  const cw=document.getElementById('chart-wrap');
+  cw.style.display='flex';
+}
+
+/* ── Kick off ── */
+init();
+</script>
+</body>
+</html>
