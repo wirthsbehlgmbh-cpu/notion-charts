@@ -308,10 +308,16 @@ function extractVal(prop){
     case 'number':return prop.number??0;
     case 'select':return prop.select?.name??'';
     case 'multi_select':return prop.multi_select?.map(s=>s.name).join(', ')??'';
-    case 'checkbox':return prop.checkbox?'Ja':'Nein';
+    case 'checkbox':return prop.checkbox?1:0;  // Numerischer Wert für Checkboxen
     case 'date':return prop.date?.start??'';
-    case 'formula':return prop.formula?.number??prop.formula?.string??'';
-    case 'rollup':return prop.rollup?.number??prop.rollup?.array?.length??'';
+    case 'formula':
+      // Formeln können verschiedene Typen zurückgeben
+      if(prop.formula?.type==='number')return prop.formula.number??0;
+      if(prop.formula?.type==='boolean')return prop.formula.boolean?1:0;
+      if(prop.formula?.type==='string')return prop.formula.string??'';
+      if(prop.formula?.type==='date')return prop.formula.date?.start??'';
+      return prop.formula?.number??prop.formula?.string??'';
+    case 'rollup':return prop.rollup?.number??prop.rollup?.array?.length??0;
     case 'created_time':return new Date(prop.created_time).toLocaleDateString('de-DE');
     case 'last_edited_time':return new Date(prop.last_edited_time).toLocaleDateString('de-DE');
     default:return '';
@@ -342,7 +348,7 @@ function renderChart(allRows){
   Chart.defaults.color       = C.text2;
   Chart.defaults.borderColor = C.grid;
 
-  const isCircle=P.type==='pie';
+  const isCircle=['pie','doughnut','polarArea','radar'].includes(P.type);
   const cfg={
     type:P.type, data:cdata,
     options:{
