@@ -228,6 +228,7 @@ code{
           <li><strong>Token kopieren</strong> und unten einfügen</li>
           <li>In Notion: Datenbank → <strong>···</strong> → <strong>Verbindungen</strong> → deine Integration wählen</li>
         </ol>
+        <strong style="color:var(--accent);margin-top:8px;display:block;">💡 Nach Token + DB-ID: Spalten laden klicken!</strong>
       </div>
       <div class="field">
         <label>Integration Token <span class="label-hint">(secret_…)</span></label>
@@ -261,17 +262,30 @@ code{
     <div class="section">
       <div class="section-title">Daten-Mapping</div>
       <div class="field">
-        <label>X-Achse <span class="label-hint">(Spaltenname) <strong>Pflicht</strong></span></label>
-        <input type="text" id="inp-x" placeholder="z. B. Datum" oninput="update()"/>
+        <label>Spalten laden</label>
+        <button class="btn btn-ghost btn-full" onclick="loadColumns()" id="load-cols-btn">
+          🔄 Spalten aus Datenbank laden
+        </button>
+        <div id="cols-status" style="font-size:11px;color:var(--text3);margin-top:6px;text-align:center;"></div>
+      </div>
+      <div class="field">
+        <label>X-Achse <span class="label-hint"><strong>Pflicht</strong></span></label>
+        <select id="inp-x" onchange="update()">
+          <option value="">— Bitte Spalten laden —</option>
+        </select>
       </div>
       <div class="row2">
         <div class="field">
           <label>Y-Achse <span class="label-hint">(optional)</span></label>
-          <input type="text" id="inp-y" placeholder="z. B. Betrag" oninput="update()"/>
+          <select id="inp-y" onchange="update()">
+            <option value="">— Keine —</option>
+          </select>
         </div>
         <div class="field">
           <label>Gruppierung <span class="label-hint">(optional)</span></label>
-          <input type="text" id="inp-g" placeholder="z. B. Kategorie" oninput="update()"/>
+          <select id="inp-g" onchange="update()">
+            <option value="">— Keine —</option>
+          </select>
         </div>
       </div>
       <div class="row2">
@@ -449,9 +463,9 @@ function getBase(){
 function update(){
   const key=document.getElementById('inp-key').value.trim();
   const db=document.getElementById('inp-db').value.trim().replace(/-/g,'');
-  const x=document.getElementById('inp-x').value.trim();
-  const y=document.getElementById('inp-y').value.trim();
-  const g=document.getElementById('inp-g').value.trim();
+  const x=document.getElementById('inp-x').value;
+  const y=document.getElementById('inp-y').value;
+  const g=document.getElementById('inp-g').value;
   const agg=document.getElementById('inp-agg').value;
   const max=document.getElementById('inp-max').value;
   const sort=document.getElementById('inp-sort').value;
@@ -515,7 +529,104 @@ function refreshPreview(){
   document.getElementById('prev-dot').className='prev-dot live';
   document.getElementById('prev-status').textContent='Vorschau aktiv';
 }
+
+// ── Load Database Columns ──
+async function loadColumns(){
+  const key=document.getElementById('inp-key').value.trim();
+  const db=document.getElementById('inp-db').value.trim().replace(/-/g,'');
+  const proxy=document.getElementById('inp-proxy').value.trim();
+  const statusEl=document.getElementById('cols-status');
+  const btnEl=document.getElementById('load-cols-btn');
+
+  if(!key||!db){
+    statusEl.textContent='⚠️ Bitte Token und Datenbank-ID eingeben';
+    statusEl.style.color='var(--red)';
+    return;
+  }
+
+  btnEl.disabled=true;
+  btnEl.textContent='⏳ Lade Spalten...';
+  statusEl.textContent='Verbinde mit Notion...';
+  statusEl.style.color='var(--text3)';
+
+  try{
+    const url='https://api.notion.com/v1/databases/'+db;
+    const response=await fetch(proxy+encodeURIComponent(url),{
+      method:'GET',
+      headers:{
+        'Authorization':'Bearer '+key,
+        'Notion-Version':'2022-06-28',
+        'Content-Type':'application/json'
+      }
+    });
+
+    if(!response.ok){
+      const text=await response.text().catch(()=>'');
+      throw new Error('Notion API '+response.status+': '+text.slice(0,150));
+    }
+
+    const data=await response.json();
+    const props=data.properties||{};
+    const columns=Object.keys(props);
+
+    if(columns.length===0){
+      throw new Error('Keine Spalten in der Datenbank gefunden');
+    }
+
+    // Populate dropdowns
+    populateDropdown('inp-x',columns,true);
+    populateDropdown('inp-y',columns,false);
+    populateDropdown('inp-g',columns,false);
+
+    statusEl.textContent='✓ '+columns.length+' Spalten geladen';
+    statusEl.style.color='var(--green)';
+    btnEl.textContent='✓ Spalten geladen';
+    
+    setTimeout(()=>{
+      btnEl.disabled=false;
+      btnEl.textContent='🔄 Spalten neu laden';
+    },1500);
+
+    update();
+
+  }catch(e){
+    statusEl.textContent='❌ '+e.message;
+    statusEl.style.color='var(--red)';
+    btnEl.disabled=false;
+    btnEl.textContent='🔄 Erneut versuchen';
+  }
+}
+
+function populateDropdown(id,columns,required){
+  const select=document.getElementById(id);
+  const currentVal=select.value;
+  
+  select.innerHTML='';
+  
+  if(!required){
+    const opt=document.createElement('option');
+    opt.value='';
+    opt.textContent='— Keine —';
+    select.appendChild(opt);
+  }else{
+    const opt=document.createElement('option');
+    opt.value='';
+    opt.textContent='— Bitte wählen —';
+    select.appendChild(opt);
+  }
+
+  columns.forEach(col=>{
+    const opt=document.createElement('option');
+    opt.value=col;
+    opt.textContent=col;
+    select.appendChild(opt);
+  });
+
+  // Restore previous value if it exists in new options
+  if(currentVal&&columns.includes(currentVal)){
+    select.value=currentVal;
+  }
+}
 </script>
 </body>
 </html>
-
