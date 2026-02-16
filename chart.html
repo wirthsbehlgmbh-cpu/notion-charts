@@ -117,59 +117,34 @@ body {
 .chart-header {
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px;
-  height: 24px;           /* fixed so canvas gets the rest */
+  height: 28px;           /* fixed so canvas gets the rest */
   flex-shrink: 0;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .chart-title {
-  font-size: 13px; font-weight: 600; letter-spacing: -.01em;
+  font-size: 14px; font-weight: 600; letter-spacing: -.01em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.chart-meta { font-size: 10px; color: var(--text3); white-space: nowrap; flex-shrink: 0; }
 
-/* footer: fixed height */
-.footer {
-  display: flex; align-items: center; justify-content: space-between;
-  height: 28px;           /* fixed */
-  flex-shrink: 0;
-  padding-top: 6px;
-  border-top: 1px solid var(--border);
-  margin-top: 6px;
-}
-.footer-left {
-  display: flex; 
-  align-items: center; 
-  gap: 8px;
-}
-.footer-badge  { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--text3); }
-.live-dot      { width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 5px var(--green); animation: pulse 2s ease-in-out infinite; }
-@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
 
-/* ── THEME TOGGLE BUTTON ── */
-.theme-toggle-btn {
-  font-size: 10px; 
+/* header button */
+.refresh-btn {
+  font-size: 11px; 
   color: var(--text2); 
   background: var(--bg3); 
   border: 1px solid var(--border); 
-  padding: 3px 8px; 
-  border-radius: 4px; 
+  padding: 4px 10px; 
+  border-radius: 5px; 
   cursor: pointer; 
   font-family: inherit; 
   transition: all .15s;
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  font-weight: 500;
 }
-.theme-toggle-btn:hover { 
+.refresh-btn:hover { 
   color: var(--text); 
   border-color: var(--text3); 
+  background: var(--bg);
 }
-.theme-icon {
-  font-size: 11px;
-}
-
-.refresh-btn   { font-size: 10px; color: var(--text2); background: var(--bg3); border: 1px solid var(--border); padding: 2px 8px; border-radius: 4px; cursor: pointer; font-family: inherit; transition: all .15s; }
-.refresh-btn:hover { color: var(--text); border-color: var(--text3); }
 
 /* canvas wrapper: takes ALL remaining space */
 .canvas-wrap {
@@ -207,20 +182,10 @@ body {
 <div id="chart-wrap">
   <div class="chart-header">
     <span class="chart-title" id="chart-title"></span>
-    <span class="chart-meta"  id="chart-meta"></span>
+    <button class="refresh-btn" onclick="init()">↻ Aktualisieren</button>
   </div>
   <div class="canvas-wrap" id="canvas-wrap">
     <canvas id="myChart"></canvas>
-  </div>
-  <div class="footer">
-    <div class="footer-left">
-      <div class="footer-badge"><div class="live-dot"></div>Live · Notion</div>
-      <button class="theme-toggle-btn" onclick="cycleTheme()" id="theme-toggle-btn">
-        <span class="theme-icon" id="theme-icon">🌙</span>
-        <span id="theme-label">Dark</span>
-      </button>
-    </div>
-    <button class="refresh-btn" onclick="init()">↻ Aktualisieren</button>
   </div>
 </div>
 
@@ -284,48 +249,7 @@ function applyTheme(){
     document.documentElement.classList.toggle('light', actualTheme === 'light');
   }
 
-  updateThemeButton();
   return actualTheme;
-}
-
-function updateThemeButton() {
-  const btn = document.getElementById('theme-toggle-btn');
-  const icon = document.getElementById('theme-icon');
-  const label = document.getElementById('theme-label');
-  
-  if (!btn) return;
-
-  switch(currentThemeMode) {
-    case 'auto':
-      icon.textContent = '🔄';
-      label.textContent = 'Auto';
-      break;
-    case 'dark':
-      icon.textContent = '🌙';
-      label.textContent = 'Dark';
-      break;
-    case 'light':
-      icon.textContent = '☀️';
-      label.textContent = 'Light';
-      break;
-  }
-}
-
-function cycleTheme() {
-  // Cycle: auto → dark → light → auto
-  const modes = ['auto', 'dark', 'light'];
-  const currentIndex = modes.indexOf(currentThemeMode);
-  currentThemeMode = modes[(currentIndex + 1) % modes.length];
-  
-  // Save preference
-  localStorage.setItem('notionChartTheme', currentThemeMode);
-  
-  applyTheme();
-  
-  // Rebuild chart with new theme
-  if (chartInst && window._lastRows) {
-    renderChart(window._lastRows);
-  }
 }
 
 async function init(){
@@ -459,8 +383,6 @@ function renderChart(allRows){
 
   const title=P.title||(P.cumul?'Kontostand – '+P.x:P.y||P.x);
   document.getElementById('chart-title').textContent=title;
-  document.getElementById('chart-meta').textContent=
-    allRows.length+' Einträge · '+new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
   showChart();
 
   /* ── ResizeObserver: keep chart perfectly fitted at all times ── */
