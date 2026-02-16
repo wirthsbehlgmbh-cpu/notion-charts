@@ -365,10 +365,22 @@ function renderChart(allRows){
         tooltip:{
           backgroundColor:C.tooltip,borderColor:C.border,borderWidth:1,
           titleColor:C.text,bodyColor:C.text2,padding:10,cornerRadius:6,
-          callbacks:{label:ctx=>{
-            const v=typeof ctx.raw==='number'?ctx.raw.toLocaleString('de-DE',{minimumFractionDigits:0,maximumFractionDigits:2}):ctx.raw;
-            return ' '+(P.cumul?'Kontostand':(ctx.dataset.label||''))+': '+v;
-          }}
+          callbacks:{
+            label:ctx=>{
+              // Für Pie/Doughnut/Polar/Radar Charts: Prozentanteil berechnen
+              if(isCircle){
+                const dataset=ctx.dataset;
+                const total=dataset.data.reduce((sum,val)=>sum+(typeof val==='number'?val:0),0);
+                const value=ctx.raw;
+                const percentage=total>0?((value/total)*100).toFixed(1):'0.0';
+                const label=ctx.label||'';
+                return ' '+label+': '+percentage+'%';
+              }
+              // Für andere Charts: normale Anzeige
+              const v=typeof ctx.raw==='number'?ctx.raw.toLocaleString('de-DE',{minimumFractionDigits:0,maximumFractionDigits:2}):ctx.raw;
+              return ' '+(P.cumul?'Kontostand':(ctx.dataset.label||''))+': '+v;
+            }
+          }
         }
       }
     }
