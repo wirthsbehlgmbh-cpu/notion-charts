@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notion Chart – Setup</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* NOTION DARK */
+:root {
+  --bg:      #191919;
+  --bg2:     #202020;
+  --bg3:     #2f2f2f;
+  --bg4:     #3a3a3a;
+  --border:  #373737;
+  --border2: #454545;
+  --text:    #e6e6e5;
+  --text2:   #999999;
+  --text3:   #5a5a5a;
+  --accent:  #2eaadc;
+  --accent2: #529cca;
+  --green:   #4dab9a;
+  --red:     #eb5757;
+  --yellow:  #dfab01;
+}
+html.light {
+  --bg:      #ffffff;
+  --bg2:     #f7f7f5;
+  --bg3:     #efefef;
+  --bg4:     #e5e5e3;
+  --border:  #e9e9e7;
+  --border2: #d9d9d6;
+  --text:    #37352f;
+  --text2:   #9b9a97;
+  --text3:   #c4c4c2;
+  --accent:  #2eaadc;
+  --accent2: #529cca;
+  --green:   #0f7b6c;
+  --red:     #e03e3e;
+  --yellow:  #dfab01;
+}
+
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  background:var(--bg);color:var(--text);
+  min-height:100vh;font-size:14px;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── TOPBAR (Notion-style) ── */
+.topbar{
+  display:flex;align-items:center;gap:12px;
+  padding:0 24px;height:45px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg);
+  position:sticky;top:0;z-index:100;
+}
+.brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;}
+.brand-icon{font-size:16px;}
+.topbar-sep{width:1px;height:16px;background:var(--border2);}
+.topbar-sub{font-size:13px;color:var(--text2);}
+
+/* theme toggle */
+.theme-toggle{
+  margin-left:auto;display:flex;align-items:center;gap:6px;
+  font-size:12px;color:var(--text2);cursor:pointer;
+  padding:4px 10px;border-radius:5px;border:1px solid var(--border2);
+  background:var(--bg3);transition:all .15s;
+}
+.theme-toggle:hover{color:var(--text);border-color:var(--text3);}
+
+/* ── LAYOUT ── */
+.page{display:grid;grid-template-columns:420px 1fr;min-height:calc(100vh - 45px);}
+
+/* ── LEFT ── */
+.left{
+  padding:24px;border-right:1px solid var(--border);
+  overflow-y:auto;
+}
+
+/* ── SECTIONS ── */
+.section{margin-bottom:24px;}
+.section-title{
+  font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;
+  color:var(--text3);margin-bottom:12px;
+  display:flex;align-items:center;gap:8px;
+}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* ── FORM ── */
+.field{margin-bottom:10px;}
+.field:last-child{margin-bottom:0;}
+label{display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:4px;}
+.label-hint{font-size:11px;font-weight:400;color:var(--text3);margin-left:4px;}
+input,select{
+  width:100%;background:var(--bg3);
+  border:1px solid var(--border2);
+  color:var(--text);padding:7px 10px;border-radius:5px;
+  font-family:inherit;font-size:13px;outline:none;
+  transition:border-color .15s,box-shadow .15s;
+  appearance:none;
+}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(46,170,220,0.15);}
+input[type=password]{letter-spacing:2px;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
+
+/* ── NOTION CALLOUT (info box) ── */
+.callout{
+  background:var(--bg3);border-radius:6px;
+  padding:12px 14px;font-size:12px;color:var(--text2);
+  line-height:1.7;margin-bottom:14px;
+  border-left:3px solid var(--accent2);
+}
+.callout strong{color:var(--text);}
+.callout a{color:var(--accent);text-decoration:none;}
+.callout a:hover{text-decoration:underline;}
+.callout ol{padding-left:16px;margin-top:6px;}
+.callout li{margin-bottom:3px;}
+code{
+  background:var(--bg4);border:1px solid var(--border2);
+  padding:1px 5px;border-radius:3px;
+  font-size:11px;font-family:'SF Mono','Fira Code',monospace;color:var(--green);
+}
+
+/* ── PILLS (chart type) ── */
+.pill-group{display:flex;gap:5px;flex-wrap:wrap;}
+.pill{
+  padding:5px 12px;font-size:12px;font-weight:500;
+  background:var(--bg3);border:1px solid var(--border2);
+  color:var(--text2);border-radius:5px;cursor:pointer;transition:all .15s;
+}
+.pill:hover{color:var(--text);border-color:var(--border2);}
+.pill.on{background:rgba(46,170,220,0.12);border-color:var(--accent);color:var(--accent);}
+
+/* ── TOGGLE OPTION ── */
+.opt-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;}
+.opt-btn{
+  padding:5px 6px;font-size:11px;font-weight:500;text-align:center;
+  border-radius:4px;cursor:pointer;
+  background:var(--bg3);border:1px solid var(--border2);
+  color:var(--text3);transition:all .15s;
+}
+.opt-btn:hover{color:var(--text2);border-color:var(--border2);}
+.opt-btn.on{background:rgba(46,170,220,0.1);border-color:var(--accent);color:var(--accent);}
+
+/* ── BUTTONS ── */
+.btn{
+  font-family:inherit;font-size:13px;font-weight:500;
+  padding:7px 14px;border-radius:5px;border:none;
+  cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;
+}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:#29a0d0;transform:translateY(-1px);}
+.btn-ghost{background:var(--bg3);border:1px solid var(--border2);color:var(--text2);}
+.btn-ghost:hover{color:var(--text);border-color:var(--text3);}
+.btn-full{width:100%;justify-content:center;}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+
+/* ── RIGHT PANEL ── */
+.right{padding:24px;display:flex;flex-direction:column;gap:20px;}
+
+/* ── URL BOX ── */
+.url-label{font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:var(--text3);margin-bottom:8px;}
+.url-box{
+  background:var(--bg3);border:1px solid var(--border2);
+  border-radius:5px;padding:10px 12px;
+  font-family:'SF Mono','Fira Code',monospace;font-size:11px;
+  color:var(--green);word-break:break-all;line-height:1.65;
+  max-height:90px;overflow-y:auto;min-height:44px;
+}
+.url-box.empty{color:var(--text3);font-family:inherit;font-size:12px;font-style:italic;}
+.btn-row{display:flex;gap:7px;align-items:center;margin-top:8px;}
+.copy-badge{font-size:11px;color:var(--green);opacity:0;transition:opacity .3s;}
+.copy-badge.show{opacity:1;}
+
+/* ── STEPS ── */
+.steps{display:flex;flex-direction:column;gap:0;}
+.step-row{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);}
+.step-row:last-child{border-bottom:none;}
+.step-num{
+  width:22px;height:22px;border-radius:50%;flex-shrink:0;
+  background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;margin-top:1px;
+}
+.step-body{font-size:12px;color:var(--text2);line-height:1.65;}
+.step-body strong{color:var(--text);}
+
+/* ── PREVIEW ── */
+.preview-card{
+  border:1px solid var(--border);border-radius:6px;overflow:hidden;
+  background:var(--bg2);flex:1;
+}
+.preview-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:7px 12px;background:var(--bg3);border-bottom:1px solid var(--border);
+  font-size:11px;color:var(--text2);
+}
+.prev-dot{width:5px;height:5px;border-radius:50%;background:var(--border2);margin-right:5px;display:inline-block;}
+.prev-dot.live{background:var(--green);box-shadow:0 0 5px var(--green);}
+#preview-frame{width:100%;border:none;background:var(--bg);display:block;}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="brand-icon">📊</span>NotionCharts</div>
+  <div class="topbar-sep"></div>
+  <span class="topbar-sub">Embed-Konfigurator</span>
+  <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn">🌙 Dark</button>
+</header>
+
+<div class="page">
+
+  <!-- LEFT -->
+  <div class="left">
+
+    <div class="section">
+      <div class="section-title">Notion API</div>
+      <div class="callout">
+        <strong>Integration Token erstellen:</strong>
+        <ol>
+          <li>Öffne <a href="https://www.notion.so/my-integrations" target="_blank">notion.so/my-integrations</a></li>
+          <li>Klicke <strong>+ New integration</strong> und speichere</li>
+          <li>Kopiere den <strong>Internal Integration Token</strong> <code>ntn_…</code></li>
+          <li>Datenbank öffnen → <strong>⋯ → Connections → deine Integration</strong></li>
+        </ol>
+      </div>
+      <div class="field">
+        <label>Integration Token</label>
+        <input type="password" id="inp-key" placeholder="ntn_… oder secret_…" autocomplete="off" oninput="update()"/>
+      </div>
+      <div class="field">
+        <label>Datenbank-ID <span class="label-hint">aus der Notion-URL (32 Zeichen vor ?v=)</span></label>
+        <input type="text" id="inp-db" placeholder="306aa621d88480ce992bd6a73d4d8cd4" oninput="update()"/>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Chart-Typ</div>
+      <div class="field">
+        <div class="pill-group" id="type-group">
+          <div class="pill on" data-val="line" onclick="setPill('type',this)">📈 Linie</div>
+          <div class="pill"    data-val="bar"  onclick="setPill('type',this)">📊 Balken</div>
+          <div class="pill"    data-val="pie"  onclick="setPill('type',this)">🥧 Kreis</div>
+        </div>
+      </div>
+      <div class="field" id="bardir-field" style="display:none;">
+        <label>Richtung</label>
+        <div class="pill-group" id="bardir-group">
+          <div class="pill on" data-val="vertical"   onclick="setPill('bardir',this)">Vertikal</div>
+          <div class="pill"    data-val="horizontal" onclick="setPill('bardir',this)">Horizontal</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Daten-Mapping</div>
+      <div class="row2">
+        <div class="field">
+          <label>X-Achse / Labels</label>
+          <input type="text" id="inp-x" placeholder="z. B. Datum" oninput="update()"/>
+        </div>
+        <div class="field">
+          <label>Y-Achse / Werte</label>
+          <input type="text" id="inp-y" placeholder="z. B. Betrag" oninput="update()"/>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Gruppierung <span class="label-hint">(optional)</span></label>
+          <input type="text" id="inp-g" placeholder="z. B. Kategorie" oninput="update()"/>
+        </div>
+        <div class="field">
+          <label>Aggregation</label>
+          <select id="inp-agg" onchange="update()">
+            <option value="sum">Summe</option>
+            <option value="count">Anzahl</option>
+            <option value="avg">Durchschnitt</option>
+            <option value="min">Minimum</option>
+            <option value="max">Maximum</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Filter &amp; Sortierung</div>
+      <div class="row2">
+        <div class="field">
+          <label>Filter <span class="label-hint">Spalte:Wert</span></label>
+          <input type="text" id="inp-filter" placeholder="Status:Aktiv" oninput="update()"/>
+        </div>
+        <div class="field">
+          <label>Sortierung</label>
+          <select id="inp-sort" onchange="update()">
+            <option value="none">Standard</option>
+            <option value="asc">↑ Aufsteigend</option>
+            <option value="desc">↓ Absteigend</option>
+          </select>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Max. Datenpunkte</label>
+          <input type="number" id="inp-max" value="20" min="1" max="500" oninput="update()"/>
+        </div>
+        <div class="field">
+          <label>Farbpalette</label>
+          <select id="inp-pal" onchange="update()">
+            <option value="0">Notion Blau</option>
+            <option value="1">Notion Gedämpft</option>
+            <option value="2">Notion Warm</option>
+            <option value="3">Notion Grün</option>
+            <option value="4">Notion Violett</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Darstellung</div>
+      <div class="field">
+        <label>Chart-Titel <span class="label-hint">(optional)</span></label>
+        <input type="text" id="inp-title" placeholder="z. B. Kontostand 2024" oninput="update()"/>
+      </div>
+      <div class="field">
+        <label>Optionen</label>
+        <div class="opt-grid">
+          <div class="opt-btn on" id="opt-cumul"  onclick="toggleOpt('cumul')">∑ Kumulativ</div>
+          <div class="opt-btn on" id="opt-dark"   onclick="toggleOpt('dark')">🌙 Dark Mode</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>CORS-Proxy</label>
+        <input type="text" id="inp-proxy" value="https://corsproxy.io/?" oninput="update()"/>
+      </div>
+    </div>
+
+  </div><!-- /left -->
+
+  <!-- RIGHT -->
+  <div class="right">
+
+    <!-- URL Output -->
+    <div>
+      <div class="url-label">Generierte Embed-URL</div>
+      <div class="url-box empty" id="url-out">← Fülle Token, Datenbank-ID und X-Achse aus.</div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="copyUrl()" id="copy-btn" disabled>📋 URL kopieren</button>
+        <button class="btn btn-ghost"   onclick="openNew()"  id="open-btn" disabled>↗ Öffnen</button>
+        <span class="copy-badge" id="copy-badge">✓ Kopiert!</span>
+      </div>
+    </div>
+
+    <!-- Steps -->
+    <div>
+      <div class="url-label" style="margin-bottom:10px;">In Notion einfügen</div>
+      <div class="steps">
+        <div class="step-row">
+          <div class="step-num">1</div>
+          <div class="step-body">URL oben kopieren mit <strong>URL kopieren</strong></div>
+        </div>
+        <div class="step-row">
+          <div class="step-num">2</div>
+          <div class="step-body">In Notion <code>/embed</code> in eine leere Zeile tippen</div>
+        </div>
+        <div class="step-row">
+          <div class="step-num">3</div>
+          <div class="step-body">URL einfügen → <strong>Embed erstellen</strong> klicken</div>
+        </div>
+        <div class="step-row">
+          <div class="step-num">4</div>
+          <div class="step-body">Embed-Block auf gewünschte Größe ziehen – fertig! ✅</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GitHub hint -->
+    <div class="callout">
+      <strong>🚀 Hosting auf GitHub Pages (kostenlos):</strong><br>
+      Notion braucht eine öffentliche URL. So geht's:<br>
+      <ol>
+        <li><a href="https://github.com/new" target="_blank">github.com/new</a> → Neues Repository (Public)</li>
+        <li><strong>chart.html</strong> und <strong>setup.html</strong> hochladen</li>
+        <li><strong>Settings → Pages → Branch: main → Save</strong></li>
+        <li>URL: <code>https://NAME.github.io/REPO/chart.html?…</code></li>
+      </ol>
+    </div>
+
+    <!-- Preview -->
+    <div class="preview-card" style="min-height:220px;">
+      <div class="preview-bar">
+        <span><span class="prev-dot" id="prev-dot"></span><span id="prev-status">Keine URL generiert</span></span>
+        <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px;" onclick="refreshPreview()">↻</button>
+      </div>
+      <iframe id="preview-frame" src="about:blank" height="220"></iframe>
+    </div>
+
+  </div><!-- /right -->
+</div>
+
+<script>
+const OPTS={cumul:true,dark:true};
+const PILLS={type:'line',bardir:'vertical'};
+let currentTheme='dark';
+
+function toggleTheme(){
+  currentTheme=currentTheme==='dark'?'light':'dark';
+  document.documentElement.classList.toggle('light',currentTheme==='light');
+  document.getElementById('theme-btn').textContent=currentTheme==='dark'?'🌙 Dark':'☀️ Light';
+  update();
+}
+
+function setPill(key,el){
+  PILLS[key]=el.dataset.val;
+  el.closest('.pill-group').querySelectorAll('.pill').forEach(p=>p.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('bardir-field').style.display=PILLS.type==='bar'?'block':'none';
+  update();
+}
+
+function toggleOpt(k){
+  OPTS[k]=!OPTS[k];
+  document.getElementById('opt-'+k).classList.toggle('on',OPTS[k]);
+  update();
+}
+
+function getBase(){
+  const href=window.location.href.replace(/\/[^/]*$/,'/chart.html');
+  return href;
+}
+
+function update(){
+  const key=document.getElementById('inp-key').value.trim();
+  const db=document.getElementById('inp-db').value.trim().replace(/-/g,'');
+  const x=document.getElementById('inp-x').value.trim();
+  const y=document.getElementById('inp-y').value.trim();
+  const g=document.getElementById('inp-g').value.trim();
+  const agg=document.getElementById('inp-agg').value;
+  const max=document.getElementById('inp-max').value;
+  const sort=document.getElementById('inp-sort').value;
+  const pal=document.getElementById('inp-pal').value;
+  const filter=document.getElementById('inp-filter').value.trim();
+  const title=document.getElementById('inp-title').value.trim();
+  const proxy=document.getElementById('inp-proxy').value.trim();
+
+  const urlBox=document.getElementById('url-out');
+  const copyBtn=document.getElementById('copy-btn');
+  const openBtn=document.getElementById('open-btn');
+
+  if(!key||!db||!x){
+    urlBox.textContent='← Token, Datenbank-ID und X-Achse ausfüllen.';
+    urlBox.className='url-box empty';
+    copyBtn.disabled=true;openBtn.disabled=true;
+    return;
+  }
+
+  const p=new URLSearchParams();
+  p.set('key',key);p.set('db',db);p.set('x',x);
+  p.set('type',PILLS.type);
+  if(y)p.set('y',y);
+  if(g)p.set('g',g);
+  if(agg!=='sum')p.set('agg',agg);
+  if(max!=='20')p.set('max',max);
+  if(sort!=='none')p.set('sort',sort);
+  if(pal!=='0')p.set('pal',pal);
+  if(filter)p.set('filter',filter);
+  if(title)p.set('title',title);
+  if(PILLS.type==='bar'&&PILLS.bardir!=='vertical')p.set('bardir',PILLS.bardir);
+  if(OPTS.cumul)p.set('cumul','1');
+  p.set('theme',OPTS.dark?'dark':'light');
+  if(proxy!=='https://corsproxy.io/?')p.set('proxy',proxy);
+
+  const url=getBase()+'?'+p.toString();
+  urlBox.textContent=url;
+  urlBox.className='url-box';
+  copyBtn.disabled=false;openBtn.disabled=false;
+  window._url=url;
+  refreshPreview();
+}
+
+function copyUrl(){
+  if(!window._url)return;
+  navigator.clipboard.writeText(window._url).then(()=>{
+    const b=document.getElementById('copy-badge');
+    b.classList.add('show');
+    setTimeout(()=>b.classList.remove('show'),2000);
+  });
+}
+
+function openNew(){if(window._url)window.open(window._url,'_blank');}
+
+function refreshPreview(){
+  if(!window._url)return;
+  document.getElementById('preview-frame').src=window._url;
+  document.getElementById('prev-dot').className='prev-dot live';
+  document.getElementById('prev-status').textContent='Vorschau aktiv';
+}
+</script>
+</body>
+</html>

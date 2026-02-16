@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notion Chart</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* NOTION DARK */
+:root {
+  --bg:     #191919;
+  --bg3:    #2f2f2f;
+  --border: #373737;
+  --text:   #e6e6e5;
+  --text2:  #999999;
+  --text3:  #5a5a5a;
+  --accent: #2eaadc;
+  --green:  #4dab9a;
+  --red:    #eb5757;
+}
+/* NOTION LIGHT */
+html.light {
+  --bg:     #ffffff;
+  --bg3:    #efefef;
+  --border: #e9e9e7;
+  --text:   #37352f;
+  --text2:  #9b9a97;
+  --text3:  #c4c4c2;
+  --green:  #0f7b6c;
+  --red:    #e03e3e;
+}
+
+/* ── KEY FIX: fill the iframe fully, no scrollbars ── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+html {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+
+  /* Use absolute positioning so we control every pixel */
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px 10px;
+  overflow: hidden;
+}
+
+/* ── LOADING ── */
+#loading {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 12px;
+  background: var(--bg);
+}
+.spinner {
+  width: 26px; height: 26px;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .65s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 13px; color: var(--text2); font-weight: 500; }
+.loading-sub  { font-size: 11px; color: var(--text3); }
+
+/* ── ERROR ── */
+#error-state {
+  display: none;
+  position: absolute; inset: 0;
+  flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 8px; text-align: center; padding: 20px;
+  background: var(--bg);
+}
+.error-icon  { font-size: 28px; margin-bottom: 2px; }
+.error-title { font-size: 13px; font-weight: 600; }
+.error-msg   { font-size: 12px; color: var(--red); max-width: 340px; line-height: 1.6; }
+.error-hint  { font-size: 11px; color: var(--text2); max-width: 340px; line-height: 1.6; white-space: pre-wrap; }
+
+/* ── CHART WRAP ── */
+#chart-wrap {
+  display: none;
+  flex-direction: column;
+
+  /* fill body exactly */
+  position: absolute;
+  inset: 0;
+  padding: 12px 14px 10px;
+  overflow: hidden;
+}
+
+/* header: fixed height */
+.chart-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px;
+  height: 24px;           /* fixed so canvas gets the rest */
+  flex-shrink: 0;
+  margin-bottom: 6px;
+}
+.chart-title {
+  font-size: 13px; font-weight: 600; letter-spacing: -.01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chart-meta { font-size: 10px; color: var(--text3); white-space: nowrap; flex-shrink: 0; }
+
+/* footer: fixed height */
+.footer {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 28px;           /* fixed */
+  flex-shrink: 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  margin-top: 6px;
+}
+.footer-badge  { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--text3); }
+.live-dot      { width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 5px var(--green); animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
+.refresh-btn   { font-size: 10px; color: var(--text2); background: var(--bg3); border: 1px solid var(--border); padding: 2px 8px; border-radius: 4px; cursor: pointer; font-family: inherit; transition: all .15s; }
+.refresh-btn:hover { color: var(--text); border-color: var(--text3); }
+
+/* canvas wrapper: takes ALL remaining space */
+.canvas-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;       /* never let canvas overflow */
+  min-height: 0;          /* flex shrink fix */
+}
+
+/* canvas: always match wrapper exactly */
+.canvas-wrap canvas {
+  display: block;
+  position: absolute;
+  top: 0; left: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text">Lade Notion-Daten…</div>
+  <div class="loading-sub" id="loading-sub"></div>
+</div>
+
+<div id="error-state">
+  <div class="error-icon">⚠️</div>
+  <div class="error-title">Fehler</div>
+  <div class="error-msg"  id="error-msg"></div>
+  <div class="error-hint" id="error-hint"></div>
+</div>
+
+<div id="chart-wrap">
+  <div class="chart-header">
+    <span class="chart-title" id="chart-title"></span>
+    <span class="chart-meta"  id="chart-meta"></span>
+  </div>
+  <div class="canvas-wrap" id="canvas-wrap">
+    <canvas id="myChart"></canvas>
+  </div>
+  <div class="footer">
+    <div class="footer-badge"><div class="live-dot"></div>Live · Notion</div>
+    <button class="refresh-btn" onclick="init()">↻ Aktualisieren</button>
+  </div>
+</div>
+
+<script>
+const PALS=[
+  ['#2eaadc','#4dab9a','#9065b0','#e9ae02','#529cca','#448361','#d44c47','#e16f3d'],
+  ['#529cca','#448361','#9065b0','#cb912f','#4dab9a','#d44c47','#e16f3d','#c4554d'],
+  ['#e9ae02','#e16f3d','#d44c47','#9065b0','#2eaadc','#4dab9a','#529cca','#448361'],
+  ['#4dab9a','#448361','#2eaadc','#9065b0','#e9ae02','#529cca','#d44c47','#e16f3d'],
+  ['#9065b0','#6940a5','#2eaadc','#4dab9a','#e9ae02','#d44c47','#529cca','#e16f3d'],
+];
+
+let P={}, chartInst=null;
+
+function parseParams(){
+  const sp=new URLSearchParams(window.location.search);
+  P={
+    key:    sp.get('key')    ||'',
+    db:     sp.get('db')     ||'',
+    x:      sp.get('x')      ||'',
+    y:      sp.get('y')      ||'',
+    g:      sp.get('g')      ||'',
+    agg:    sp.get('agg')    ||'sum',
+    max:    parseInt(sp.get('max')||'20'),
+    sort:   sp.get('sort')   ||'none',
+    type:   sp.get('type')   ||'line',
+    bardir: sp.get('bardir') ||'vertical',
+    cumul:  sp.get('cumul')  ==='1',
+    title:  sp.get('title')  ||'',
+    pal:    parseInt(sp.get('pal')||'0'),
+    filter: sp.get('filter') ||'',
+    proxy:  sp.get('proxy')  ||'https://corsproxy.io/?',
+    theme:  sp.get('theme')  ||'dark',
+  };
+}
+
+function applyTheme(){
+  document.documentElement.classList.toggle('light', P.theme==='light');
+}
+
+async function init(){
+  parseParams(); applyTheme();
+  if(!P.key||!P.db||!P.x){
+    showError('Fehlende Parameter in der URL','Benötigt: key= · db= · x=\nSetup-Seite öffnen: setup.html');
+    return;
+  }
+  setLoading('Verbinde mit Notion…');
+  try{
+    const rows=await loadAllRows();
+    renderChart(rows);
+  } catch(e){
+    showError('Fehler beim Laden der Notion-Daten', e.message);
+  }
+}
+
+/* ── Notion API ── */
+async function nfetch(url,body){
+  const r=await fetch(P.proxy+encodeURIComponent(url),{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+P.key,'Notion-Version':'2022-06-28','Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  if(!r.ok){const t=await r.text().catch(()=>'');throw new Error('Notion API '+r.status+': '+t.slice(0,220));}
+  return r.json();
+}
+
+async function loadAllRows(){
+  let rows=[],cursor;
+  for(let i=0;i<5;i++){
+    const body={page_size:100};
+    if(cursor)body.start_cursor=cursor;
+    setLoading('Lade… ('+rows.length+' Einträge)');
+    const res=await nfetch('https://api.notion.com/v1/databases/'+P.db+'/query',body);
+    rows=rows.concat((res.results||[]).map(extractRow));
+    if(!res.has_more)break;
+    cursor=res.next_cursor;
+  }
+  return rows;
+}
+
+function extractRow(page){
+  const row={};
+  Object.entries(page.properties||{}).forEach(([col,prop])=>{row[col]=extractVal(prop);});
+  return row;
+}
+
+function extractVal(prop){
+  switch(prop.type){
+    case 'title':return prop.title?.[0]?.plain_text??'';
+    case 'rich_text':return prop.rich_text?.[0]?.plain_text??'';
+    case 'number':return prop.number??0;
+    case 'select':return prop.select?.name??'';
+    case 'multi_select':return prop.multi_select?.map(s=>s.name).join(', ')??'';
+    case 'checkbox':return prop.checkbox?'Ja':'Nein';
+    case 'date':return prop.date?.start??'';
+    case 'formula':return prop.formula?.number??prop.formula?.string??'';
+    case 'rollup':return prop.rollup?.number??prop.rollup?.array?.length??'';
+    case 'created_time':return new Date(prop.created_time).toLocaleDateString('de-DE');
+    case 'last_edited_time':return new Date(prop.last_edited_time).toLocaleDateString('de-DE');
+    default:return '';
+  }
+}
+
+/* ── Chart ── */
+function renderChart(allRows){
+  let rows=allRows.slice();
+  if(P.filter){const[col,...rest]=P.filter.split(':');const val=rest.join(':').toLowerCase();rows=rows.filter(r=>String(r[col]??'').toLowerCase().includes(val));}
+  if(P.sort!=='none'&&P.y)rows.sort((a,b)=>{const av=+a[P.y]||0,bv=+b[P.y]||0;return P.sort==='asc'?av-bv:bv-av;});
+
+  const pal=PALS[P.pal%PALS.length];
+  const cdata=P.g&&P.y?buildGrouped(rows,pal):P.y?buildSimple(rows,pal):buildCount(rows,pal);
+
+  if(chartInst){chartInst.destroy();chartInst=null;}
+
+  const dark=P.theme!=='light';
+  const C={
+    text:    dark?'#e6e6e5':'#37352f',
+    text2:   dark?'#999999':'#9b9a97',
+    grid:    dark?'#2f2f2f':'#f0f0ef',
+    tooltip: dark?'#2f2f2f':'#ffffff',
+    border:  dark?'#373737':'#e9e9e7',
+  };
+  Chart.defaults.color       = C.text2;
+  Chart.defaults.borderColor = C.grid;
+
+  const isCircle=P.type==='pie';
+  const cfg={
+    type:P.type, data:cdata,
+    options:{
+      indexAxis: P.type==='bar'&&P.bardir==='horizontal'?'y':'x',
+      responsive: true,
+      maintainAspectRatio: false,   /* critical: fill the container */
+      animation: {duration:500, easing:'easeInOutQuart'},
+      plugins:{
+        legend:{
+          display: isCircle||!!P.g,
+          labels:{color:C.text,font:{family:"'Inter',sans-serif",size:11},padding:10,usePointStyle:true,pointStyleWidth:8}
+        },
+        title:{display:false},
+        tooltip:{
+          backgroundColor:C.tooltip,borderColor:C.border,borderWidth:1,
+          titleColor:C.text,bodyColor:C.text2,padding:10,cornerRadius:6,
+          callbacks:{label:ctx=>{
+            const v=typeof ctx.raw==='number'?ctx.raw.toLocaleString('de-DE',{minimumFractionDigits:0,maximumFractionDigits:2}):ctx.raw;
+            return ' '+(P.cumul?'Kontostand':(ctx.dataset.label||''))+': '+v;
+          }}
+        }
+      }
+    }
+  };
+
+  if(!isCircle){
+    cfg.options.scales={
+      x:{grid:{display:true,color:C.grid},ticks:{color:C.text2,font:{family:"'Inter',sans-serif",size:10},maxRotation:45},border:{color:C.grid}},
+      y:{grid:{display:true,color:C.grid},ticks:{color:C.text2,font:{family:"'Inter',sans-serif",size:10},callback:v=>typeof v==='number'?v.toLocaleString('de-DE'):v},border:{color:C.grid}}
+    };
+  }
+  if(P.type==='line'){
+    cdata.datasets.forEach(ds=>{ds.tension=0.4;ds.fill=true;ds.pointRadius=3;ds.pointHoverRadius=6;ds.borderWidth=2;});
+  }
+
+  const canvas=document.getElementById('myChart');
+  chartInst=new Chart(canvas,cfg);
+
+  const title=P.title||(P.cumul?'Kontostand – '+P.x:P.y||P.x);
+  document.getElementById('chart-title').textContent=title;
+  document.getElementById('chart-meta').textContent=
+    allRows.length+' Einträge · '+new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  showChart();
+
+  /* ── ResizeObserver: keep chart perfectly fitted at all times ── */
+  if(window._resizeObs) window._resizeObs.disconnect();
+  window._resizeObs = new ResizeObserver(()=>{
+    if(chartInst) chartInst.resize();
+  });
+  window._resizeObs.observe(document.getElementById('canvas-wrap'));
+}
+
+/* ── Data helpers ── */
+function toCumulative(v){let s=0;return v.map(x=>{s+=x;return Math.round(s*100)/100;});}
+
+function doAgg(vals,m){
+  if(!vals.length)return 0;
+  switch(m){
+    case 'sum':   return vals.reduce((a,b)=>a+b,0);
+    case 'count': return vals.length;
+    case 'avg':   return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*100)/100;
+    case 'min':   return Math.min(...vals);
+    case 'max':   return Math.max(...vals);
+    default:      return vals.reduce((a,b)=>a+b,0);
+  }
+}
+
+function buildSimple(rows,pal){
+  const map={};
+  rows.forEach(r=>{const k=String(r[P.x]??'(leer)');(map[k]||(map[k]=[])).push(+r[P.y]||0);});
+  const entries=Object.entries(map).slice(0,P.max);
+  const labels=entries.map(([k])=>k);
+  let values=entries.map(([,v])=>doAgg(v,P.agg));
+  if(P.cumul)values=toCumulative(values);
+  const c=pal[0];
+  return{labels,datasets:[{
+    label:P.cumul?P.y+' (kumulativ)':P.y, data:values,
+    backgroundColor:P.type==='line'?c+'28':entries.map((_,i)=>pal[i%pal.length]+'cc'),
+    borderColor:P.type==='line'?c:entries.map((_,i)=>pal[i%pal.length]),
+    borderWidth:2, hoverOffset:6,
+  }]};
+}
+
+function buildGrouped(rows,pal){
+  const xVals=[...new Set(rows.map(r=>String(r[P.x]??'')))].slice(0,P.max);
+  const groups=[...new Set(rows.map(r=>String(r[P.g]??'')))];
+  const datasets=groups.map((g,gi)=>{
+    const color=pal[gi%pal.length];
+    let data=xVals.map(x=>{const m=rows.filter(r=>String(r[P.x])===x&&String(r[P.g])===g);return doAgg(m.map(r=>+r[P.y]||0),P.agg);});
+    if(P.cumul)data=toCumulative(data);
+    return{label:P.cumul?g+' (kumulativ)':g,data,backgroundColor:P.type==='line'?color+'28':color+'cc',borderColor:color,borderWidth:2};
+  });
+  return{labels:xVals,datasets};
+}
+
+function buildCount(rows,pal){
+  const cnt={};
+  rows.forEach(r=>{const k=String(r[P.x]??'(leer)');cnt[k]=(cnt[k]||0)+1;});
+  const entries=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,P.max);
+  const colors=entries.map((_,i)=>pal[i%pal.length]);
+  return{
+    labels:entries.map(([k])=>k),
+    datasets:[{label:'Anzahl',data:entries.map(([,v])=>v),backgroundColor:colors.map(c=>c+'cc'),borderColor:colors,borderWidth:2,hoverOffset:6}]
+  };
+}
+
+/* ── UI state ── */
+function setLoading(sub){
+  document.getElementById('loading').style.display='flex';
+  document.getElementById('error-state').style.display='none';
+  document.getElementById('chart-wrap').style.display='none';
+  document.getElementById('loading-sub').textContent=sub;
+}
+function showError(msg,hint){
+  document.getElementById('loading').style.display='none';
+  document.getElementById('chart-wrap').style.display='none';
+  document.getElementById('error-state').style.display='flex';
+  document.getElementById('error-msg').textContent=msg;
+  document.getElementById('error-hint').textContent=hint||'';
+}
+function showChart(){
+  document.getElementById('loading').style.display='none';
+  document.getElementById('error-state').style.display='none';
+  document.getElementById('chart-wrap').style.display='flex';
+}
+
+init();
+</script>
+</body>
+</html>
